@@ -27,3 +27,4 @@ Dans l’ordre :
 ## Protection des secrets GitHub
 
 La capture des réglages Secret Protection et Push protection sera ajoutée après vérification des paramètres du dépôt.
+<img width="579" height="275" alt="Capture d&#39;écran 2026-11-04 135637" src="https://github.com/user-attachments/assets/b77c08c8-71ea-484c-8bc4-21fdd5fc8912" />
