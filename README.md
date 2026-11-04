@@ -27,3 +27,15 @@ Dans l’ordre :
 ## Protection des secrets GitHub
 
 La capture des réglages Secret Protection et Push protection sera ajoutée après vérification des paramètres du dépôt.
+
+## Failles corrigées
+
+Ces URL illustrent les failles présentes dans la version de départ. Elles ne doivent être utilisées que comme exemples : le serveur vulnérable ne doit jamais être exposé à Internet.
+
+| Route | Faille | URL d’exploitation sur la version initiale | Correction |
+|---|---|---|---|
+| `/hello` | XSS réfléchie : le nom fourni est inséré sans échappement dans une page HTML. | `http://localhost:3000/hello?name=%3Cscript%3Ealert(1)%3C%2Fscript%3E` | Échapper les caractères spéciaux HTML avant l’affichage. |
+| `/ping` | Injection de commande : `exec` interprète l’entrée utilisateur dans un shell. | `http://localhost:3000/ping?host=google.com%3Bcat%20%2Fetc%2Fpasswd` | Valider strictement l’hôte et appeler `execFile` avec des arguments séparés. |
+| `/prefs` | Prototype pollution : `_.merge` fusionne récursivement les paramètres non fiables. | `http://localhost:3000/prefs?__proto__%5Badmin%5D=true` | Construire la réponse uniquement à partir des clés `theme` et `lang`. |
+
+Les tests de régression correspondants sont dans `tests/security.test.js`.
