@@ -37,3 +37,107 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm audit --audit-level=high
+
+  image:
+    needs: [test, deps-audit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout initial naive Docker image
+        uses: actions/checkout@v4
+        with:
+          ref: 1483edd48201672be075a89921ff612ae03a634c
+          path: baseline
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build naive baseline image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./baseline
+          file: ./baseline/Dockerfile
+          load: true
+          tags: devsecops-tp:naif
+
+      - name: Build optimized image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: devsecops-tp:optim
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Report image size and layer counts
+        shell: bash
+        run: |
+          {
+            echo '### Tailles Docker (CI)'
+            echo '| Image | Taille | Couches |'
+            echo '|---|---:|---:|'
+          } >> "$GITHUB_STEP_SUMMARY"
+          for image in devsecops-tp:naif devsecops-tp:optim; do
+            read -r bytes layers < <(docker image inspect "$image" --format '{{.Size}} {{len .RootFS.Layers}}')
+            printf '| `%s` | %s | %s |\n' "$image" "$(numfmt --to=iec --suffix=B "$bytes")" "$layers" >> "$GITHUB_STEP_SUMMARY"
+            printf 'IMAGE_METRIC %s size_bytes=%s layers=%s\n' "$image" "$bytes" "$layers"
+          done
+
+      - name: Smoke test optimized container
+        shell: bash
+        run: |
+          docker run --rm -d --name devsecops-tp-smoke -p 3000:3000 devsecops-tp:optim
+          trap 'docker stop devsecops-tp-smoke >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:3000/health | jq -e '.status == "ok"' >/dev/null; then
+              echo 'Le conteneur répond correctement sur /health.'
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs devsecops-tp-smoke
+          exit 1
+
+      - name: Scan naive baseline image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0, immutable SHA
+        with:
+          image-ref: devsecops-tp:naif
+          severity: CRITICAL,HIGH
+          format: json
+          output: trivy-naif.json
+          exit-code: '0'
+
+      - name: Scan optimized image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0, immutable SHA
+        with:
+          image-ref: devsecops-tp:optim
+          severity: CRITICAL,HIGH
+          format: json
+          output: trivy-optim.json
+          exit-code: '0'
+
+      - name: Report image vulnerabilities
+        shell: bash
+        run: |
+          {
+            echo '### Scan Trivy (HIGH/CRITICAL, correctifs disponibles ou non)'
+            echo '| Image | HIGH | CRITICAL |'
+            echo '|---|---:|---:|'
+          } >> "$GITHUB_STEP_SUMMARY"
+          for image in naif optim; do
+            high=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' "trivy-$image.json")
+            critical=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' "trivy-$image.json")
+            printf '| `%s` | %s | %s |\n' "$image" "$high" "$critical" >> "$GITHUB_STEP_SUMMARY"
+            printf 'TRIVY_METRIC %s high=%s critical=%s\n' "$image" "$high" "$critical"
+          done
+
+      - name: Fail on fixable high or critical vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0, immutable SHA
+        with:
+          image-ref: devsecops-tp:optim
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
