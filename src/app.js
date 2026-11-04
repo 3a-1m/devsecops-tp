@@ -1,8 +1,10 @@
 const express = require('express');
+const { rateLimit } = require('express-rate-limit');
 const { execFile } = require('child_process');
 
 const app = express();
 const hostnamePattern = /^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
+const pingLimiter = rateLimit({ windowMs: 60_000, limit: 10 });
 
 function escapeHtml(value) {
   const characters = {
@@ -25,7 +27,7 @@ app.get('/hello', (req, res) => {
 });
 
 // Outil réseau : ping un hôte validé sans passer par un shell
-app.get('/ping', (req, res) => {
+app.get('/ping', pingLimiter, (req, res) => {
   const host = req.query.host;
   if (typeof host !== 'string' || !hostnamePattern.test(host) || host !== host.trim()) {
     return res.status(400).json({ error: 'Hôte invalide' });

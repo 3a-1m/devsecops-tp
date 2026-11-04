@@ -39,3 +39,15 @@ Ces URL illustrent les failles présentes dans la version de départ. Elles ne d
 | `/prefs` | Prototype pollution : `_.merge` fusionne récursivement les paramètres non fiables. | `http://localhost:3000/prefs?__proto__%5Badmin%5D=true` | Construire la réponse uniquement à partir des clés `theme` et `lang`. |
 
 Les tests de régression correspondants sont dans `tests/security.test.js`.
+
+### Alertes CodeQL sur la version initiale
+
+Le premier scan du commit `9273752` a relevé ces alertes sur `main` :
+
+| Règle | Fichier et ligne initiale | Gravité | Traitement |
+|---|---|---|---|
+| `js/reflected-xss` | `src/app.js:12` | Haute | Échappement HTML ajouté sur `/hello`. |
+| `js/command-line-injection` | `src/app.js:17` | Critique | Validation de l’hôte et `execFile` sur `/ping`. |
+| `js/missing-rate-limiting` | `src/app.js:16` | Haute | Limiteur ajouté sur `/ping` : 10 requêtes par minute. |
+
+La prototype pollution de `/prefs` a été trouvée en lisant le code : CodeQL ne l’a pas signalée. La route ne fusionne désormais plus les paramètres avec `_.merge` et ne renvoie que `theme` et `lang`.
