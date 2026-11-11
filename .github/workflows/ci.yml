@@ -55,7 +55,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
 
       - name: Build naive baseline image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./baseline
           file: ./baseline/Dockerfile
@@ -63,7 +63,7 @@ jobs:
           tags: devsecops-tp:naif
 
       - name: Build optimized image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
