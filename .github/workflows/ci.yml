@@ -52,7 +52,7 @@ jobs:
           path: baseline
           persist-credentials: false
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build naive baseline image
         uses: docker/build-push-action@v6
